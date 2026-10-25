@@ -1,0 +1,110 @@
+(function() {
+  function escapeHtml(text) {
+    return String(text)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function buildFootnoteLink(text) {
+    const a = document.createElement('a');
+    a.rel = 'noopener noreferrer';
+    a.target = '_blank';
+    a.textContent = text;
+    a.href = text;
+    return a;
+  }
+
+  function isLink(text) {
+    return /^(https?:\/\/|mailto:|ftp:\/\/)/i.test(text.trim());
+  }
+
+  function sanitizeId(id) {
+    return String(id).trim().replace(/[^A-Za-z0-9_-]/g, '-');
+  }
+
+  function findReferencePlaceholder() {
+    return document.querySelector('.footnotes-placeholder');
+  }
+
+  function collectFootnotes() {
+    const nodes = Array.from(document.querySelectorAll('.footnote-ref'));
+    const footnotes = [];
+    const seen = new Set();
+
+    nodes.forEach(function(node) {
+      const rawId = node.dataset.footnoteId || node.textContent.replace(/^[\[\]]+|[\[\]]+$/g, '').trim();
+      const rawContent = node.dataset.footnoteContent || '';
+      const id = sanitizeId(rawId);
+      if (!id || seen.has(id)) return;
+      seen.add(id);
+      footnotes.push({
+        id: id,
+        label: rawId,
+        content: rawContent.trim()
+      });
+    });
+
+    return footnotes;
+  }
+
+  function renderFootnotes() {
+    const placeholder = findReferencePlaceholder();
+    if (!placeholder) return;
+
+    const footnotes = collectFootnotes();
+    if (!footnotes.length) return;
+
+    const section = document.createElement('section');
+    section.className = 'footnotes';
+
+    const divider = document.createElement('hr');
+    section.appendChild(divider);
+
+    const list = document.createElement('ol');
+    list.className = 'footnotes-list';
+
+    footnotes.forEach(function(item) {
+      const li = document.createElement('li');
+      li.id = '​footnote-item-' + item.id;
+      li.className = 'footnote-item';
+
+      const backLink = document.createElement('a');
+      backLink.className = 'footnote-backref';
+      backLink.href = '#​footnote-ref-' + item.id;
+      backLink.textContent = '↑ ';
+      backLink.setAttribute('aria-label', 'Return to content');
+      li.appendChild(backLink);
+
+      const paragraph = document.createElement('p');
+      paragraph.className = 'footnote-item-content';
+      paragraph.style.display = 'inline-block';
+      
+      if (item.content) {
+        if (isLink(item.content)) {
+          paragraph.appendChild(buildFootnoteLink(item.content));
+        } else {
+          paragraph.innerHTML = DOMPurify.sanitize(marked.parse(item.content));
+        }
+      }
+
+      li.appendChild(paragraph);
+      list.appendChild(li);
+    });
+
+    section.appendChild(list);
+    placeholder.appendChild(section);
+
+    tippy(document.querySelector('.footnote-ref'), {
+      animation: 'shift-toward',
+      arrow: true,
+      arrowType: 'round',
+      delay: [0, 75],
+      duration: [270, 300]
+    })
+  }
+
+  renderFootnotes();
+})();
